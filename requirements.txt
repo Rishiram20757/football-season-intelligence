@@ -1,0 +1,14 @@
+# Football Season Intelligence — reproducible environment
+# Python 3.11 tested. Versions recorded at project creation (2026-10-21).
+# Core analysis stack
+pandas==3.0.6
+numpy==2.4.6
+requests==2.34.2
+# Visualisation stack
+matplotlib==3.11.2
+seaborn==0.13.2
+mplsoccer==1.8.1
+# Notebook execution / conversion (used to run and validate the notebook)
+jupyter==1.1.1
+nbclient==0.11.0
+nbconvert==7.17.2

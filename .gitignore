@@ -1,0 +1,41 @@
+# Compiled Python / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+.checkpoints/
+
+# Virtual environments and local packages
+.venv/
+venv/
+env/
+ENV/
+
+# Local secrets / credentials
+.env
+.env.*
+*.secrets
+.secrets/
+credentials.json
+service-account.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Raw StatsBomb data downloaded at runtime from the official repository.
+# Do not commit: re-download via the notebook (Section 4) and cite the source.
+data/raw/*.json
+data/raw/**/*.json
