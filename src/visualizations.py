@@ -14,13 +14,14 @@ from typing import Any
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib import rcParams
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from mplsoccer import Pitch
 
 from data_loader import PITCH_LENGTH, PITCH_WIDTH
-from data_validation import PASS_INCOMPLETE_OUTCOMES
+from data_validation import PASS_INCOMPLETE_OUTCOMES, SHOT_GOAL
 
 
 def _type_name(event: dict[str, Any]) -> str:
@@ -468,3 +469,184 @@ def plot_pass_map(
     ax.set_title(title, pad=10, loc="left", fontweight="bold")
     ax.text(1.0, -0.12, "Solid = completed · dashed = incomplete · attacking left → right", transform=ax.transAxes, ha="right", fontsize=8.5, color="#666666")
     return save_fig(fig, path)
+
+
+# ---------------------------------------------------------------------------
+# Player-specific charts
+# ---------------------------------------------------------------------------
+
+
+def plot_player_shot_map(
+    shot_table,
+    player_name: str,
+    path: Path | str,
+    title: str | None = None,
+) -> Path:
+    """Shot map for a single player: goals (orange) vs non-goals (grey)."""
+    data = shot_table[shot_table["player"] == player_name].copy()
+    pitch = Pitch(**PITCH_KWARGS)
+    fig, ax = pitch.draw(figsize=(11, 7))
+
+    non_goals = data[~data["is_goal"]]
+    goals = data[data["is_goal"]]
+
+    if not non_goals.empty:
+        pitch.scatter(non_goals["shot_x"], non_goals["shot_y"], ax=ax, s=60, color=GREY, alpha=0.75, edgecolor="white", linewidth=0.4)
+    if not goals.empty:
+        pitch.scatter(goals["shot_x"], goals["shot_y"], ax=ax, s=150, color=ORANGE, edgecolor="white", linewidth=1.4, zorder=5)
+
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="w", label="Non-goal shot", markerfacecolor=GREY, markersize=9, alpha=0.8),
+        Line2D([0], [0], marker="o", color="w", label="Goal", markerfacecolor=ORANGE, markersize=13, markeredgecolor="white"),
+    ]
+    ax.legend(handles=legend_elements, loc="lower left", frameon=False, title="Shot outcome")
+    t = title or f"Shot map — {player_name}"
+    ax.set_title(t, pad=10, loc="left", fontweight="bold")
+    ax.text(1.0, -0.12, "Attacking left → right (StatsBomb pitch 120×80, goal at x = 120)", transform=ax.transAxes, ha="right", fontsize=8.5, color="#666666")
+    return save_fig(fig, path)
+
+
+def plot_player_shot_outcomes(
+    shot_table,
+    player_name: str,
+    path: Path | str,
+    title: str | None = None,
+) -> Path:
+    """Bar chart of shot outcomes for a single player."""
+    data = shot_table[shot_table["player"] == player_name].copy()
+    if data.empty:
+        raise ValueError("No shots found for player " + player_name)
+    counts = data["outcome"].value_counts().sort_values(ascending=True)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    colours = [ORANGE if o == SHOT_GOAL else GREY for o in counts.index]
+    bars = ax.barh(counts.index, counts.values, color=colours, edgecolor="white")
+    for bar, value in zip(bars, counts.values, strict=False):
+        ax.annotate(str(int(value)), (bar.get_width(), bar.get_y() + bar.get_height() / 2), textcoords="offset points", xytext=(3, 0), va="center", fontsize=9, fontweight="bold")
+    ax.set_xlabel("Number of shots")
+    ax.set_title(title or f"Shot outcomes — {player_name}", pad=12, loc="left", fontweight="bold")
+    ax.set_axisbelow(True)
+    return save_fig(fig, path)
+
+
+def plot_player_heatmap(
+    events_by_match: dict[int, list[dict[str, Any]]],
+    player_id: int,
+    path: Path | str,
+    title: str | None = None,
+) -> Path:
+    """Event-location heatmap for a single player (all event types)."""
+    xs, ys = [], []
+    for events in events_by_match.values():
+        for event in events:
+            p = event.get("player")
+            if p and p.get("id") == player_id:
+                loc = event.get("location")
+                if isinstance(loc, list) and len(loc) >= 2:
+                    xs.append(float(loc[0]))
+                    ys.append(float(loc[1]))
+    pitch = Pitch(**PITCH_KWARGS)
+    fig, ax = pitch.draw(figsize=(11, 7))
+    if xs:
+        ax.hist2d(xs, ys, bins=15, cmap="YlOrRd", alpha=0.85, zorder=2)
+    t = title or f"Event heatmap — player {player_id}"
+    ax.set_title(t, pad=10, loc="left", fontweight="bold")
+    ax.text(1.0, -0.12, "All event locations, not tracking data (StatsBomb pitch 120×80)", transform=ax.transAxes, ha="right", fontsize=8.5, color="#666666")
+    return save_fig(fig, path)
+
+
+def plot_player_match_by_match(
+    shot_table,
+    pass_table,
+    player_id: int,
+    player_name: str,
+    path: Path | str,
+    title: str | None = None,
+) -> Path:
+    """Match-by-match summary: shots, goals, xG, passes for one player."""
+    rows = []
+    for mid in sorted(shot_table["match_id"].unique()):
+        s = shot_table[(shot_table["match_id"] == mid) & (shot_table["player_id"] == player_id)]
+        p = pass_table[(pass_table["match_id"] == mid) & (pass_table["player_id"] == player_id)]
+        goals = int(s["is_goal"].sum())
+        shots = int(len(s))
+        xg = float(s["xg"].sum()) if "xg" in s.columns else 0.0
+        passes = int(len(p))
+        passes_comp = int(p["is_complete"].sum()) if not p.empty else 0
+        rows.append({"match_id": mid, "shots": shots, "goals": goals, "xg": xg, "passes": passes, "pass_comp": passes_comp})
+    df = pd.DataFrame(rows)
+    if df.empty:
+        raise ValueError("No match data found for player " + player_name)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    fig.suptitle(title or f"Match-by-match performance — {player_name}", fontsize=13, fontweight="bold", y=1.02)
+
+    axes[0, 0].bar(df["match_id"].astype(str), df["shots"], color=STEEL, edgecolor="white")
+    axes[0, 0].set_title("Shots per match")
+    axes[0, 0].set_xlabel("Match ID")
+    axes[0, 0].set_ylabel("Shots")
+    axes[0, 0].tick_params(axis="x", rotation=45, labelsize=7)
+
+    axes[0, 1].bar(df["match_id"].astype(str), df["goals"], color=ORANGE, edgecolor="white")
+    axes[0, 1].set_title("Goals per match")
+    axes[0, 1].set_xlabel("Match ID")
+    axes[0, 1].set_ylabel("Goals")
+    axes[0, 1].tick_params(axis="x", rotation=45, labelsize=7)
+
+    axes[1, 0].bar(df["match_id"].astype(str), df["xg"], color=NAVY, edgecolor="white")
+    axes[1, 0].set_title("xG per match")
+    axes[1, 0].set_xlabel("Match ID")
+    axes[1, 0].set_ylabel("xG")
+    axes[1, 0].tick_params(axis="x", rotation=45, labelsize=7)
+
+    axes[1, 1].bar(df["match_id"].astype(str), df["passes"], color=GREY, edgecolor="white")
+    axes[1, 1].set_title("Passes per match")
+    axes[1, 1].set_xlabel("Match ID")
+    axes[1, 1].set_ylabel("Passes")
+    axes[1, 1].tick_params(axis="x", rotation=45, labelsize=7)
+
+    fig.tight_layout()
+    return save_fig(fig, path)
+
+
+def plot_player_comparison(
+    player_table,
+    focal_player: str,
+    path: Path | str,
+    title: str | None = None,
+    top_n: int = 10,
+) -> Path:
+    """Compare focal player against peers on goals, shots, xG (per 90 where minutes available)."""
+    df = player_table.copy()
+    focal = df[df["player"] == focal_player]
+    if focal.empty:
+        raise ValueError("Focal player not found: " + focal_player)
+
+    # Select attackers: players with at least 5 shots as a reasonable filter
+    attackers = df[df["shots"] >= 5].copy()
+    if "minutes_played" in attackers.columns and attackers["minutes_played"].notna().any():
+        attackers = attackers[attackers["minutes_played"].notna() & (attackers["minutes_played"] > 0)].copy()
+        attackers["shots_per_90"] = attackers["shots"] / attackers["minutes_played"] * 90.0
+        attackers["goals_per_90"] = attackers["goals"] / attackers["minutes_played"] * 90.0
+        attackers["xg_per_90"] = attackers["xg"] / attackers["minutes_played"] * 90.0
+        metric_col = "goals_per_90"
+        sort_col = "goals_per_90"
+    else:
+        metric_col = "goals"
+        sort_col = "goals"
+
+    attackers = attackers.sort_values(sort_col, ascending=False).head(top_n)
+    attackers = attackers.iloc[::-1]
+
+    fig, ax = plt.subplots(figsize=(10, max(4, 0.4 * len(attackers) + 1)))
+    colours = [NAVY if p == focal_player else STEEL for p in attackers["player"]]
+    bars = ax.barh(attackers["player"], attackers[metric_col], color=colours, edgecolor="white")
+    for bar, (_, row) in zip(bars, attackers.iterrows(), strict=False):
+        val = row[metric_col]
+        ax.annotate(f"{val:.2f}", (bar.get_width(), bar.get_y() + bar.get_height() / 2), textcoords="offset points", xytext=(3, 0), va="center", fontsize=9, fontweight="bold")
+
+    label = metric_col.replace("_", " ").title()
+    ax.set_xlabel(label)
+    ax.set_title(title or f"Goals per 90 — {focal_player} vs peers (min 5 shots)", pad=12, loc="left", fontweight="bold")
+    ax.set_axisbelow(True)
+    return save_fig(fig, path)
+

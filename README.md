@@ -175,6 +175,75 @@ under `outputs/figures/`. No credentials are required.
 
 Data: StatsBomb Open Data (https://github.com/statsbomb/open-data). Visualisation: mplsoccer.
 
+## Heung-Min Son: Player Intelligence Case Study
+
+### Objective and research questions
+
+A focused, data-driven investigation of Heung-Min Son's attacking performance for Tottenham Hotspur in the English Premier League 2015/2016 season, using verified StatsBomb Open Data events. The companion notebook is `notebooks/02_heung_min_son_player_analysis.ipynb`.
+
+Research questions:
+1. Where does Son generate his shots and attacking actions on the pitch?
+2. How does his shot quality (xG) compare with his actual goal output?
+3. What kinds of actions (shots, passes, carries, dribbles) contribute to his attacking involvement?
+4. How does his per-90 attacking profile compare with other Premier League attackers?
+5. What can — and cannot — be concluded from this sample?
+
+### Competition and season
+
+English Premier League 2015/2016 (`competition_id: 2`, `season_id: 27`) — the same season analysed in Project 1. All 380 matches and event files were processed.
+
+### Player profile
+
+| Attribute | Value |
+|---|---|
+| Name | Heung-Min Son |
+| StatsBomb player ID | 3083 |
+| Team | Tottenham Hotspur |
+| Competition | Premier League 2015/2016 |
+| Lineup entries | 30 |
+| Appearances played (minutes > 0) | 28 |
+| Started | 13 |
+| Substitute on | 15 |
+| Minutes played | ~1,105 (derived from lineup position intervals) |
+
+### Key findings (computed from the executed analysis)
+
+- **Shots:** 38 shots, 4 goals (10.5% conversion), 13 shots on target (34.2%)
+- **Expected goals:** Total xG 3.85, xG per shot 0.10, goals minus xG +0.15 (scored essentially in line with expected quality)
+- **Passing:** 455 passes, 359 completed (78.9% completion), 1 goal assist, 17 shot assists
+- **Other actions:** 469 carries, 49 dribbles
+- **Per 90 minutes:** 3.10 shots per 90, 0.33 goals per 90, 0.31 xG per 90
+- **Comparison:** Among 349 Premier League attackers with >= 5 shots and minutes data, Son ranks 52nd for goals per 90 and 46th for xG per 90
+
+### Visualisations
+
+| Figure | Description |
+|---|---|
+| `outputs/figures/son_shot_map.png` | Shot map — goals vs non-goals |
+| `outputs/figures/son_shot_outcomes.png` | Shot outcome breakdown (goal, saved, blocked, off target) |
+| `outputs/figures/son_attacking_heatmap.png` | Event location heatmap (all event types) |
+| `outputs/figures/son_match_by_match_performance.png` | Match-by-match: shots, goals, xG, passes |
+| `outputs/figures/son_player_comparison.png` | Goals per 90 vs peers (min 5 shots) |
+
+### Limitations
+
+- Single season (Premier League 2015/2016); descriptive, not generalising.
+- Event data records on-ball actions only; off-ball positioning and full tactical shape are not observed.
+- Minutes played are derived from lineup position intervals and treated as approximate; per-90 rates are indicative, not definitive.
+- Sample is modest: ~1,105 minutes across 28 appearances.
+- xG is StatsBomb's `statsbomb_xg` estimate, not ground truth; no xG model is trained.
+- Comparison set is limited to players in this one season with shot and minutes data.
+
+### Reproduction
+
+```bash
+# from the football-season-intelligence folder
+pip install -r requirements.txt
+jupyter notebook notebooks/02_heung_min_son_player_analysis.ipynb
+```
+
+The notebook downloads/caches StatsBomb files from `raw.githubusercontent.com/statsbomb/open-data` and writes figures to `outputs/figures/`. No API key or payment is required.
+
 ## Future extensions
 
 Expected-goals modelling, player clustering, passing networks, and scouting models — this
